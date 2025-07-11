@@ -33,12 +33,11 @@ Um script shell (`install_redteam_tools.sh`) foi desenvolvido para automatizar o
 
 1. **Baixe o script `install_redteam_tools.sh`** para o seu servidor. Se você já tem o arquivo `install_redteam_tools.sh` e `pwndrop-linux-amd64.tar.gz` no seu ambiente, pode pular o download.
 
-   ```bash
-   # Exemplo de download (se o script estiver hospedado em algum lugar)
-   # wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/linux%20machine/install_redteam_tools.sh
-   # OU
-   # curl -o install_redteam_tools.sh https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/linux%20machine/install_redteam_tools.sh
-   ```
+```bash
+wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/Machine/tools/install_redteam_tools.sh
+# Ou
+curl -o install_redteam_tools.sh https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/linux%20machine/install_redteam_tools.sh
+```
 
 2. **Conceda permissões de execução** ao script:
 

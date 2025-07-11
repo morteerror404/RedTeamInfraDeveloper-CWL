@@ -30,9 +30,7 @@ Para a execução bem-sucedida deste script, o sistema operacional deve ser base
 Primeiro, baixe o script `install_redteam_tools.sh` para o seu sistema. Você pode fazer isso usando `wget` ou `curl` se ele estiver hospedado em algum lugar, ou copiá-lo diretamente para o seu servidor.
 
 ```bash
-wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/linux%20machine/tools/install_redteam_tools.sh # Exemplo, substitua pela URL real
-# OU
-# Copie o conteúdo do script para um arquivo chamado install_redteam_tools.sh
+wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/Machine/tools/install_redteam_tools.sh 
 ```
 
 ### 2. Tornar o Script Executável

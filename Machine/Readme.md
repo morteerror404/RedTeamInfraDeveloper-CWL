@@ -64,12 +64,12 @@ Após a execução do script e a coleta de informações, o repositório terá a
 ├── system_info.txt           # Informações do sistema (OS, kernel, hardware)
 ├── services.txt              # Lista de serviços em execução
 ├── config_files/             # Arquivos de configuração do sistema
-│   ├── nginx/               # Configurações do Nginx (se aplicável)
-│   ├── apache2/             # Configurações do Apache (se aplicável)
-│   ├── sshd_config          # Configuração do SSH
-│   └── ...                  # Outros arquivos de configuração
-├── README.md                # Esta documentação
-└── .gitignore               # Arquivo para excluir dados sensíveis
+│   ├── nginx/                # Configurações do Nginx (se aplicável)
+│   ├── apache2/              # Configurações do Apache (se aplicável)
+│   ├── sshd_config           # Configuração do SSH
+│   └── ...                   # Outros arquivos de configuração
+├── README.md                 # Esta documentação
+└── .gitignore                # Arquivo para excluir dados sensíveis
 ```
 
 ## Como Configurar o Ambiente
@@ -102,7 +102,7 @@ sudo cp -r /etc/nginx /etc/apache2 /etc/ssh/sshd_config config_files/ 2>/dev/nul
 ### 3. Baixar e Executar o Script de Instalação
 - Baixe o script `install_redteam_tools.sh` :
   ```bash
-  wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/linux%20machine/tools/install_redteam_tools.sh
+  wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/Machine/tools/install_redteam_tools.sh
   ```
 - Torne o script executável:
   ```bash
