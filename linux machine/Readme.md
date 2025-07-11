@@ -102,7 +102,7 @@ sudo cp -r /etc/nginx /etc/apache2 /etc/ssh/sshd_config config_files/ 2>/dev/nul
 ### 3. Baixar e Executar o Script de Instalação
 - Baixe o script `install_redteam_tools.sh` :
   ```bash
-  wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/linux%20machine/install_redteam_tools.sh
+  wget https://github.com/morteerror404/RedTeamInfraDeveloper-CWL/blob/main/linux%20machine/tools/install_redteam_tools.sh
   ```
 - Torne o script executável:
   ```bash
@@ -178,7 +178,7 @@ git commit -m "Configuração inicial do servidor Ubuntu com ferramentas de Red 
 - Crie um repositório no GitHub (ex.: `meu-servidor-config`).
 - Vincule o repositório local:
 ```bash
-git remote add origin https://github.com/seu-usuario/meu-servidor-config.git
+git remote add origin https://github.com/morteerror404/RedTeamInfraDeveloper-CWL.git
 ```
 - Suba os arquivos:
 ```bash
