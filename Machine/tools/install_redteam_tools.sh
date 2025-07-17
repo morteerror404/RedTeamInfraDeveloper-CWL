@@ -3,15 +3,16 @@
 # Script para instalação e configuração automatizada de ferramentas de Red Team
 # Ferramentas: curl, unzip, tree, Evilginx, Gophish, Pwndrop
 # Integração: RedTeamInfraDeveloper-CWL repository
-# Autor: Adaptado por OxMorte ou Morteerror404
+# Autor: Adaptado por 0xMorte ou Morteerror404
 
 # --- Configurações ---
 set -euo pipefail
 
-# Variáveis (agora usando diretório do usuário)
+# Variáveis
+USER="$(whoami)"
 USER_DIR="$(pwd)"
 INSTALL_DIR="${USER_DIR}"
-REPO_DIR="${USER_DIR}/RedTeamInfraDeveloper-CWL)"
+REPO_DIR="${USER_DIR}/RedTeamInfraDeveloper-CWL"
 APP_DIR="${REPO_DIR}/App-web"
 LOG_DIR="${USER_DIR}/logs"
 
@@ -51,6 +52,12 @@ check_root() {
     fi
 }
 
+check_sudo() {
+    if ! sudo -n true 2>/dev/null; then
+        log_error "Este script requer privilégios de sudo para algumas operações. Configure sudo sem senha ou execute como root."
+    fi
+}
+
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
@@ -58,7 +65,9 @@ command_exists() {
 check_port_available() {
     local port=$1
     local service=$2
-    if ss -tulpn | grep -q ":${port} "; then
+    if command_exists ss && ss -tulpn | grep -q ":${port} "; then
+        log_error "Porta ${port} já está em uso por outro serviço (${service})"
+    elif command_exists netstat && netstat -tulpn 2>/dev/null | grep -q ":${port} "; then
         log_error "Porta ${port} já está em uso por outro serviço (${service})"
     fi
 }
@@ -85,7 +94,8 @@ install_dependencies() {
         libcap2-bin \
         git \
         wget \
-        sqlite3
+        sqlite3 \
+        net-tools
 }
 
 install_go() {
@@ -100,11 +110,13 @@ install_go() {
         
         log_info "Extraindo Go para ${INSTALL_DIR}/go..."
         tar -xzf "/tmp/${GO_TAR}" -C "${INSTALL_DIR}" || log_error "Falha ao extrair Go."
+        rm -f "/tmp/${GO_TAR}"
         
         log_info "Configurando PATH para Go..."
-        echo "export PATH=\$PATH:${INSTALL_DIR}/go/bin" >> "${USER_DIR}/.bashrc"
-        echo "export GOPATH=${INSTALL_DIR}/go" >> "${USER_DIR}/.bashrc"
-        source "${USER_DIR}/.bashrc"
+        echo "export PATH=\$PATH:${INSTALL_DIR}/go/bin" >> "${HOME}/.bashrc"
+        echo "export GOPATH=${INSTALL_DIR}/go" >> "${HOME}/.bashrc"
+        export PATH=$PATH:${INSTALL_DIR}/go/bin
+        export GOPATH=${INSTALL_DIR}/go
         
         command_exists go || log_error "Go não está no PATH após instalação."
         log_info "Go instalado: $(go version)"
@@ -119,10 +131,10 @@ create_user_service() {
     local config_path="$3"
     local user="$4"
     local description="$5"
-    local service_file="${USER_DIR}/.config/systemd/user/${service_name}.service"
+    local service_file="${HOME}/.config/systemd/user/${service_name}.service"
 
     log_info "Criando serviço do usuário para ${service_name}..."
-    mkdir -p "${USER_DIR}/.config/systemd/user"
+    mkdir -p "${HOME}/.config/systemd/user"
     
     cat > "${service_file}" <<EOF
 [Unit]
@@ -169,6 +181,7 @@ install_evilginx() {
     
     wget -q --show-progress "${EVILGINX_URL}" -O "${INSTALL_DIR}/${EVILGINX_ZIP}" || log_error "Falha ao baixar Evilginx."
     unzip -o "${INSTALL_DIR}/${EVILGINX_ZIP}" -d "${INSTALL_DIR}/evilginx" || log_error "Falha ao extrair Evilginx."
+    rm -f "${INSTALL_DIR}/${EVILGINX_ZIP}"
     
     chmod +x "${INSTALL_DIR}/evilginx/evilginx"
     sudo setcap cap_net_bind_service=+ep "${INSTALL_DIR}/evilginx/evilginx"
@@ -193,6 +206,7 @@ install_gophish() {
     
     wget -q --show-progress "${GOPHISH_URL}" -O "${INSTALL_DIR}/${GOPHISH_ZIP}" || log_error "Falha ao baixar Gophish."
     unzip -o "${INSTALL_DIR}/${GOPHISH_ZIP}" -d "${INSTALL_DIR}/gophish" || log_error "Falha ao extrair Gophish."
+    rm -f "${INSTALL_DIR}/${GOPHISH_ZIP}"
     
     chmod +x "${INSTALL_DIR}/gophish/gophish"
 
@@ -228,9 +242,11 @@ install_pwndrop() {
 
     wget -q --show-progress "${PWNDROP_URL}" -O "${INSTALL_DIR}/${PWNDROP_TAR}" || log_error "Falha ao baixar Pwndrop."
     tar -xzf "${INSTALL_DIR}/${PWNDROP_TAR}" -C "${INSTALL_DIR}/pwndrop" || log_error "Falha ao extrair Pwndrop."
+    rm -f "${INSTALL_DIR}/${PWNDROP_TAR}"
     
     chmod +x "${INSTALL_DIR}/pwndrop/pwndrop"
     mkdir -p "${INSTALL_DIR}/pwndrop/data"
+    chown -R "${USER}:${USER}" "${INSTALL_DIR}/pwndrop"
 
     # Configuração
     cat > "${INSTALL_DIR}/pwndrop/pwndrop.ini" <<EOF
@@ -263,21 +279,21 @@ setup_services() {
     create_user_service "evilginx" \
         "${INSTALL_DIR}/evilginx/evilginx" \
         "${INSTALL_DIR}/evilginx/config.yaml" \
-        "$USER" \
+        "${USER}" \
         "Evilginx Phishing Framework"
     
     # Gophish
     create_user_service "gophish" \
         "${INSTALL_DIR}/gophish/gophish" \
         "${INSTALL_DIR}/gophish/config.json" \
-        "$USER" \
+        "${USER}" \
         "Gophish Phishing Framework"
     
     # Pwndrop
     create_user_service "pwndrop" \
         "${INSTALL_DIR}/pwndrop/pwndrop" \
         "${INSTALL_DIR}/pwndrop/pwndrop.ini" \
-        "$USER" \
+        "${USER}" \
         "Pwndrop Web Server"
 }
 
@@ -289,6 +305,7 @@ main() {
     echo
     
     check_root
+    check_sudo
     setup_directories
     install_dependencies
     install_go
@@ -303,7 +320,7 @@ main() {
     
     # Configuração final
     log_info "Configurando ambiente do usuário..."
-    echo "alias redteam-env='cd ${USER_DIR} && systemctl --user status'" >> "${USER_DIR}/.bashrc"
+    echo "alias redteam-env='cd ${USER_DIR} && systemctl --user status'" >> "${HOME}/.bashrc"
     
     # Resumo
     echo -e "\n\033[1;32m=== Instalação Concluída com Sucesso ===\033[0m"
