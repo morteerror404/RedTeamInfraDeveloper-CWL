@@ -8,15 +8,16 @@
 # --- Variáveis de Configuração ---
 EVILGINX_VERSION="3.3.0"
 GOPHISH_VERSION="0.12.1"
-PWNDROP_VERSION="latest"
+PWNDROP_VERSION="1.0.1"  # Última versão conhecida; atualize se necessário
 REPO_URL="https://github.com/morteerror404/RedTeamInfraDeveloper-CWL.git"
-INSTALL_DIR="/opt/redteam_tools"
-REPO_DIR="/opt/RedTeamInfraDeveloper-CWL"
+INSTALL_DIR="/home/"
+REPO_DIR="/home/RedTeamInfraDeveloper-CWL"
 APP_DIR="$REPO_DIR/App-web"
 PWNDROP_PORT=8080
 EVILGINX_PORT=8443
 GOPHISH_PORT=3333
 PWNDROP_TAR="pwndrop-linux-amd64.tar.gz"
+PWNDROP_URL="https://github.com/kgretzky/pwndrop/releases/download/${PWNDROP_VERSION}/${PWNDROP_TAR}"
 
 # --- Funções Auxiliares ---
 log_info() {
@@ -30,7 +31,7 @@ log_error() {
 
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
-        log_error "Este script precisa ser executado como root. Por favor, use sudo."
+        log_error "Este script precisa ser executado como root. Use sudo."
     fi
 }
 
@@ -46,16 +47,48 @@ install_go() {
         GO_URL="https://go.dev/dl/${GO_TAR}"
 
         log_info "Baixando ${GO_TAR}..."
-        wget -q --show-progress "${GO_URL}" -O /tmp/${GO_TAR} || log_error "Falha ao baixar Go."
+        wget -q --show-progress "${GO_URL}" -O "/tmp/${GO_TAR}" || log_error "Falha ao baixar Go."
+        [ -f "/tmp/${GO_TAR}" ] || log_error "Arquivo Go ${GO_TAR} não encontrado."
         log_info "Extraindo Go para /usr/local..."
-        rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/${GO_TAR} || log_error "Falha ao extrair Go."
+        rm -rf /usr/local/go && tar -C /usr/local -xzf "/tmp/${GO_TAR}" || log_error "Falha ao extrair Go."
         log_info "Configurando variáveis de ambiente para Go..."
         echo "export PATH=\$PATH:/usr/local/go/bin" | tee -a /etc/environment > /dev/null
         export PATH=$PATH:/usr/local/go/bin
+        source /etc/environment
+        command_exists go || log_error "Go não está no PATH após instalação."
         log_info "Go instalado: $(go version)"
     else
         log_info "Go já está instalado: $(go version)"
     fi
+}
+
+create_systemd_service() {
+    local service_name="$1"
+    local exec_path="$2"
+    local config_path="$3"
+    local user="$4"
+    local description="$5"
+    local service_file="/etc/systemd/system/${service_name}.service"
+
+    log_info "Criando serviço systemd para ${service_name}..."
+    cat > "${service_file}" <<EOF
+[Unit]
+Description=${description}
+After=network.target
+
+[Service]
+ExecStart=${exec_path} -c ${config_path}
+Restart=always
+User=${user}
+WorkingDirectory=$(dirname ${exec_path})
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable "${service_name}"
+    systemctl start "${service_name}"
+    systemctl is-active --quiet "${service_name}" && log_info "${service_name} iniciado com sucesso." || log_error "Falha ao iniciar ${service_name}."
 }
 
 # --- Início do Script ---
@@ -90,6 +123,7 @@ EVILGINX_URL="https://github.com/kgretzky/evilginx2/releases/download/v${EVILGIN
 
 log_info "Baixando ${EVILGINX_ZIP}..."
 wget -q --show-progress "${EVILGINX_URL}" -O "${INSTALL_DIR}/${EVILGINX_ZIP}" || log_error "Falha ao baixar Evilginx."
+[ -f "${INSTALL_DIR}/${EVILGINX_ZIP}" ] || log_error "Arquivo Evilginx ${EVILGINX_ZIP} não encontrado."
 log_info "Extraindo Evilginx..."
 unzip -o "${INSTALL_DIR}/${EVILGINX_ZIP}" -d "${INSTALL_DIR}/evilginx" || log_error "Falha ao extrair Evilginx."
 log_info "Configurando permissões para Evilginx..."
@@ -114,6 +148,7 @@ GOPHISH_URL="https://github.com/gophish/gophish/releases/download/v${GOPHISH_VER
 
 log_info "Baixando ${GOPHISH_ZIP}..."
 wget -q --show-progress "${GOPHISH_URL}" -O "${INSTALL_DIR}/${GOPHISH_ZIP}" || log_error "Falha ao baixar Gophish."
+[ -f "${INSTALL_DIR}/${GOPHISH_ZIP}" ] || log_error "Arquivo Gophish ${GOPHISH_ZIP} não encontrado."
 log_info "Extraindo Gophish..."
 unzip -o "${INSTALL_DIR}/${GOPHISH_ZIP}" -d "${INSTALL_DIR}/gophish" || log_error "Falha ao extrair Gophish."
 log_info "Configurando Gophish..."
@@ -141,18 +176,13 @@ EOF
 
 # --- Instalação do Pwndrop ---
 log_info "Iniciando instalação do Pwndrop..."
-if [ -f "./${PWNDROP_TAR}" ]; then
-    PWNDROP_TAR_PATH="./${PWNDROP_TAR}"
-elif [ -f "/home/ubuntu/${PWNDROP_TAR}" ]; then
-    PWNDROP_TAR_PATH="/home/ubuntu/${PWNDROP_TAR}"
-else
-    log_error "Arquivo ${PWNDROP_TAR} não encontrado em $(pwd) ou /home/ubuntu."
-fi
-
+log_info "Baixando ${PWNDROP_TAR}..."
+wget -q --show-progress "${PWNDROP_URL}" -O "${INSTALL_DIR}/${PWNDROP_TAR}" || log_error "Falha ao baixar Pwndrop."
+[ -f "${INSTALL_DIR}/${PWNDROP_TAR}" ] || log_error "Arquivo Pwndrop ${PWNDROP_TAR} não encontrado."
 log_info "Extraindo Pwndrop..."
-tar -xzf "${PWNDROP_TAR_PATH}" -C "${INSTALL_DIR}" || log_error "Falha ao extrair Pwndrop."
+tar -xzf "${INSTALL_DIR}/${PWNDROP_TAR}" -C "${INSTALL_DIR}" || log_error "Falha ao extrair Pwndrop."
 log_info "Configurando permissões para Pwndrop..."
-chmod +x "${INSTALL_DIR}/pwndrop"
+chmod +x "${INSTALL_DIR}/pwndrop/pwndrop"
 mkdir -p "${INSTALL_DIR}/pwndrop/data"
 chown -R nobody:nogroup "${INSTALL_DIR}/pwndrop"
 
@@ -173,35 +203,20 @@ ufw allow 53 comment "Evilginx DNS"
 ufw allow ${GOPHISH_PORT}/tcp comment "Gophish Admin/Phish"
 ufw --force enable
 
-# --- Iniciar Serviços ---
-log_info "Iniciando Pwndrop..."
-su -s /bin/bash -c "pwndrop -c ${INSTALL_DIR}/pwndrop/pwndrop.ini &" nobody
-sleep 2
-if pgrep -f "pwndrop" >/dev/null; then
-    log_info "Pwndrop iniciado na porta ${PWNDROP_PORT}."
-else
-    log_error "Falha ao iniciar Pwndrop. Verifique logs em ${INSTALL_DIR}/pwndrop."
-fi
+# --- Iniciar Serviços com Systemd ---
+create_systemd_service "pwndrop" "${INSTALL_DIR}/pwndrop/pwndrop" "${INSTALL_DIR}/pwndrop/pwndrop.ini" "nobody" "Pwndrop Web Server"
+create_systemd_service "evilginx" "${INSTALL_DIR}/evilginx/evilginx" "${INSTALL_DIR}/evilginx/config.yaml" "root" "Evilginx Phishing Server"
+create_systemd_service "gophish" "${INSTALL_DIR}/gophish/gophish" "${INSTALL_DIR}/gophish/config.json" "root" "Gophish Phishing Framework"
 
-log_info "Iniciando Evilginx..."
-"${INSTALL_DIR}/evilginx/evilginx" -c "${INSTALL_DIR}/evilginx/config.yaml" &
-sleep 2
-if pgrep -f "evilginx" >/dev/null; then
-    log_info "Evilginx iniciado na porta ${EVILGINX_PORT}."
-else
-    log_error "Falha ao iniciar Evilginx. Verifique logs."
-fi
-
-log_info "Iniciando Gophish..."
-cd "${INSTALL_DIR}/gophish"
-./gophish &
-sleep 2
-if pgrep -f "gophish" >/dev/null; then
-    log_info "Gophish iniciado na porta ${GOPHISH_PORT}."
-else
-    log_error "Falha ao iniciar Gophish. Verifique logs em ${INSTALL_DIR}/gophish."
-fi
-cd -
+# --- Verificação Final ---
+log_info "Verificando status dos serviços..."
+for service in pwndrop evilginx gophish; do
+    if systemctl is-active --quiet "${service}"; then
+        log_info "${service} está rodando."
+    else
+        log_error "${service} não está rodando. Verifique logs com 'journalctl -u ${service}.service'."
+    fi
+done
 
 # --- Finalização ---
 log_info "Instalação e configuração concluídas!"
@@ -212,3 +227,4 @@ log_info "- Evilginx: https://<server-ip>:${EVILGINX_PORT} (configure phishlets 
 log_info "- Gophish: http://<server-ip>:${GOPHISH_PORT}/admin"
 log_info "Repositório clonado em: ${REPO_DIR}"
 log_info "Certifique-se de configurar phishlets (Evilginx) e campanhas (Gophish) conforme necessário."
+log_info "Logs dos serviços podem ser verificados com: journalctl -u <service>.service"
