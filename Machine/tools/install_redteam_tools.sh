@@ -9,9 +9,9 @@
 set -euo pipefail
 
 # Variáveis (agora usando diretório do usuário)
-USER_DIR= echo $pwd
+USER_DIR="$(pwd)"
 INSTALL_DIR="${USER_DIR}"
-REPO_DIR="${USER_DIR}/RedTeamInfraDeveloper-CWL"
+REPO_DIR="${USER_DIR}/RedTeamInfraDeveloper-CWL)"
 APP_DIR="${REPO_DIR}/App-web"
 LOG_DIR="${USER_DIR}/logs"
 
