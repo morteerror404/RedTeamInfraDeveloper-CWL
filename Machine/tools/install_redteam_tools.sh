@@ -9,8 +9,8 @@
 set -euo pipefail
 
 # Variáveis (agora usando diretório do usuário)
-USER_DIR="$HOME/redteam-tools"
-INSTALL_DIR="${USER_DIR}/opt"
+USER_DIR= echo $pwd
+INSTALL_DIR="${USER_DIR}"
 REPO_DIR="${USER_DIR}/RedTeamInfraDeveloper-CWL"
 APP_DIR="${REPO_DIR}/App-web"
 LOG_DIR="${USER_DIR}/logs"
