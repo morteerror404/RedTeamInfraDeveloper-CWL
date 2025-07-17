@@ -5,14 +5,17 @@
 # Integração: RedTeamInfraDeveloper-CWL repository
 # Autor: Grok 3, adaptado de Manus AI
 
-# --- Variáveis de Configuração ---
+# --- Configurações ---
+set -e
+
+# Variáveis
 EVILGINX_VERSION="3.3.0"
 GOPHISH_VERSION="0.12.1"
-PWNDROP_VERSION="1.0.1"  # Última versão conhecida; atualize se necessário
+PWNDROP_VERSION="1.0.1"
 REPO_URL="https://github.com/morteerror404/RedTeamInfraDeveloper-CWL.git"
-INSTALL_DIR="/home/"
-REPO_DIR="/home/RedTeamInfraDeveloper-CWL"
-APP_DIR="$REPO_DIR/App-web"
+INSTALL_DIR="/opt"
+REPO_DIR="${INSTALL_DIR}/RedTeamInfraDeveloper-CWL"
+APP_DIR="${REPO_DIR}/App-web"
 PWNDROP_PORT=8080
 EVILGINX_PORT=8443
 GOPHISH_PORT=3333
@@ -39,13 +42,32 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+find_install_dir() {
+    local binary_name="$1"
+    local binary_path=$(which "$binary_name" 2>/dev/null)
+    if [ -n "$binary_path" ]; then
+        local install_dir=$(readlink -f "$binary_path" | xargs dirname | xargs dirname)
+        if [ -d "$install_dir" ]; then
+            echo "$install_dir"
+            return
+        fi
+    fi
+    local pid=$(pgrep -f "$binary_name" | head -n 1)
+    if [ -n "$pid" ]; then
+        local exe_path=$(readlink -f "/proc/$pid/exe")
+        local install_dir=$(dirname "$exe_path" | xargs dirname)
+        echo "$install_dir"
+        return
+    fi
+    echo ""
+}
+
 install_go() {
     log_info "Verificando e instalando Go..."
     if ! command_exists go; then
         GO_LATEST_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -n 1)
         GO_TAR="${GO_LATEST_VERSION}.linux-amd64.tar.gz"
         GO_URL="https://go.dev/dl/${GO_TAR}"
-
         log_info "Baixando ${GO_TAR}..."
         wget -q --show-progress "${GO_URL}" -O "/tmp/${GO_TAR}" || log_error "Falha ao baixar Go."
         [ -f "/tmp/${GO_TAR}" ] || log_error "Arquivo Go ${GO_TAR} não encontrado."
@@ -97,8 +119,8 @@ log_info "Atualizando pacotes do sistema..."
 apt update -y && apt upgrade -y || log_info "Falha ao atualizar pacotes, continuando..."
 
 # Instalar dependências básicas
-log_info "Instalando curl, unzip e tree..."
-apt install -y curl unzip tree || log_error "Falha ao instalar curl, unzip ou tree."
+log_info "Instalando curl, unzip, tree e ufw..."
+apt install -y curl unzip tree ufw || log_error "Falha ao instalar dependências."
 
 mkdir -p "${INSTALL_DIR}"
 cd "${INSTALL_DIR}"
@@ -120,19 +142,20 @@ log_info "Iniciando instalação do Evilginx..."
 install_go
 EVILGINX_ZIP="evilginx-v${EVILGINX_VERSION}-linux-64bit.zip"
 EVILGINX_URL="https://github.com/kgretzky/evilginx2/releases/download/v${EVILGINX_VERSION}/${EVILGINX_ZIP}"
+EVILGINX_DIR="${INSTALL_DIR}/evilginx"
 
 log_info "Baixando ${EVILGINX_ZIP}..."
 wget -q --show-progress "${EVILGINX_URL}" -O "${INSTALL_DIR}/${EVILGINX_ZIP}" || log_error "Falha ao baixar Evilginx."
 [ -f "${INSTALL_DIR}/${EVILGINX_ZIP}" ] || log_error "Arquivo Evilginx ${EVILGINX_ZIP} não encontrado."
 log_info "Extraindo Evilginx..."
-unzip -o "${INSTALL_DIR}/${EVILGINX_ZIP}" -d "${INSTALL_DIR}/evilginx" || log_error "Falha ao extrair Evilginx."
+unzip -o "${INSTALL_DIR}/${EVILGINX_ZIP}" -d "${EVILGINX_DIR}" || log_error "Falha ao extrair Evilginx."
 log_info "Configurando permissões para Evilginx..."
-chmod +x "${INSTALL_DIR}/evilginx/evilginx"
-setcap cap_net_bind_service=+eip "${INSTALL_DIR}/evilginx/evilginx"
+chmod +x "${EVILGINX_DIR}/evilginx"
+setcap cap_net_bind_service=+eip "${EVILGINX_DIR}/evilginx"
 
 # Configurar Evilginx
 log_info "Configurando Evilginx na porta ${EVILGINX_PORT}..."
-cat > "${INSTALL_DIR}/evilginx/config.yaml" <<EOF
+cat > "${EVILGINX_DIR}/config.yaml" <<EOF
 server:
   bind_addr: 0.0.0.0
   http_port: ${EVILGINX_PORT}
@@ -145,15 +168,16 @@ EOF
 log_info "Iniciando instalação do Gophish..."
 GOPHISH_ZIP="gophish-v${GOPHISH_VERSION}-linux-64bit.zip"
 GOPHISH_URL="https://github.com/gophish/gophish/releases/download/v${GOPHISH_VERSION}/${GOPHISH_ZIP}"
+GOPHISH_DIR="${INSTALL_DIR}/gophish"
 
 log_info "Baixando ${GOPHISH_ZIP}..."
 wget -q --show-progress "${GOPHISH_URL}" -O "${INSTALL_DIR}/${GOPHISH_ZIP}" || log_error "Falha ao baixar Gophish."
 [ -f "${INSTALL_DIR}/${GOPHISH_ZIP}" ] || log_error "Arquivo Gophish ${GOPHISH_ZIP} não encontrado."
 log_info "Extraindo Gophish..."
-unzip -o "${INSTALL_DIR}/${GOPHISH_ZIP}" -d "${INSTALL_DIR}/gophish" || log_error "Falha ao extrair Gophish."
+unzip -o "${INSTALL_DIR}/${GOPHISH_ZIP}" -d "${GOPHISH_DIR}" || log_error "Falha ao extrair Gophish."
 log_info "Configurando Gophish..."
-chmod +x "${INSTALL_DIR}/gophish/gophish"
-cat > "${INSTALL_DIR}/gophish/config.json" <<EOF
+chmod +x "${GOPHISH_DIR}/gophish"
+cat > "${GOPHISH_DIR}/config.json" <<EOF
 {
   "admin_server": {
     "listen_url": "0.0.0.0:${GOPHISH_PORT}",
@@ -176,19 +200,21 @@ EOF
 
 # --- Instalação do Pwndrop ---
 log_info "Iniciando instalação do Pwndrop..."
+PWNDROP_DIR="${INSTALL_DIR}/pwndrop"
 log_info "Baixando ${PWNDROP_TAR}..."
 wget -q --show-progress "${PWNDROP_URL}" -O "${INSTALL_DIR}/${PWNDROP_TAR}" || log_error "Falha ao baixar Pwndrop."
 [ -f "${INSTALL_DIR}/${PWNDROP_TAR}" ] || log_error "Arquivo Pwndrop ${PWNDROP_TAR} não encontrado."
 log_info "Extraindo Pwndrop..."
-tar -xzf "${INSTALL_DIR}/${PWNDROP_TAR}" -C "${INSTALL_DIR}" || log_error "Falha ao extrair Pwndrop."
+mkdir -p "${PWNDROP_DIR}"
+tar -xzf "${INSTALL_DIR}/${PWNDROP_TAR}" -C "${PWNDROP_DIR}" || log_error "Falha ao extrair Pwndrop."
 log_info "Configurando permissões para Pwndrop..."
-chmod +x "${INSTALL_DIR}/pwndrop/pwndrop"
-mkdir -p "${INSTALL_DIR}/pwndrop/data"
-chown -R nobody:nogroup "${INSTALL_DIR}/pwndrop"
+chmod +x "${PWNDROP_DIR}/pwndrop"
+mkdir -p "${PWNDROP_DIR}/data"
+chown -R nobody:nogroup "${PWNDROP_DIR}"
 
-# Configurar Pwndrop para servir App-web
+# Configurar Pwndrop
 log_info "Configurando Pwndrop na porta ${PWNDROP_PORT} para servir App-web..."
-cat > "${INSTALL_DIR}/pwndrop/pwndrop.ini" <<EOF
+cat > "${PWNDROP_DIR}/pwndrop.ini" <<EOF
 [http]
 listen_addr = 0.0.0.0:${PWNDROP_PORT}
 webroot = ${APP_DIR}
@@ -196,17 +222,16 @@ EOF
 
 # --- Configurar Firewall ---
 log_info "Configurando regras de firewall (ufw)..."
-apt install -y ufw || log_error "Falha ao instalar ufw."
 ufw allow ${PWNDROP_PORT}/tcp comment "Pwndrop HTTP"
 ufw allow ${EVILGINX_PORT}/tcp comment "Evilginx HTTP"
 ufw allow 53 comment "Evilginx DNS"
 ufw allow ${GOPHISH_PORT}/tcp comment "Gophish Admin/Phish"
 ufw --force enable
 
-# --- Iniciar Serviços com Systemd ---
-create_systemd_service "pwndrop" "${INSTALL_DIR}/pwndrop/pwndrop" "${INSTALL_DIR}/pwndrop/pwndrop.ini" "nobody" "Pwndrop Web Server"
-create_systemd_service "evilginx" "${INSTALL_DIR}/evilginx/evilginx" "${INSTALL_DIR}/evilginx/config.yaml" "root" "Evilginx Phishing Server"
-create_systemd_service "gophish" "${INSTALL_DIR}/gophish/gophish" "${INSTALL_DIR}/gophish/config.json" "root" "Gophish Phishing Framework"
+# --- Criar Serviços Systemd ---
+create_systemd_service "pwndrop" "${PWNDROP_DIR}/pwndrop" "${PWNDROP_DIR}/pwndrop.ini" "nobody" "Pwndrop Web Server"
+create_systemd_service "evilginx" "${EVILGINX_DIR}/evilginx" "${EVILGINX_DIR}/config.yaml" "root" "Evilginx Phishing Server"
+create_systemd_service "gophish" "${GOPHISH_DIR}/gophish" "${GOPHISH_DIR}/config.json" "root" "Gophish Phishing Framework"
 
 # --- Verificação Final ---
 log_info "Verificando status dos serviços..."
